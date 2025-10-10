@@ -2,12 +2,12 @@ import streamlit as st
 import requests
 from datetime import date
 
-HEADERS = {"X-Auth-Token": st.secrets["API_KEY"]}
+API_KEY = st.secrets["API_KEY"]
+HEADERS = {"X-Auth-Token": API_KEY}
 
 st.set_page_config(page_title="Brasileirão Série A", page_icon="⚽", layout="wide")
 
-st.markdown(
-    """
+st.markdown("""
     <style>
     .stApp {
         background-color: #0f1720;
@@ -24,17 +24,15 @@ st.markdown(
         box-shadow: 0 0 10px rgba(255,255,255,0.15);
     }
     </style>
-    """,
-    unsafe_allow_html=True
-)
+""", unsafe_allow_html=True)
 
 @st.cache_data(ttl=300)
 def buscar_dados(url):
     try:
-        r = requests.get(url, headers=HEADERS, timeout=10)
-        if r.status_code != 200:
+        resposta = requests.get(url, headers=HEADERS, timeout=10)
+        if resposta.status_code != 200:
             return None
-        return r.json()
+        return resposta.json()
     except Exception:
         return None
 
@@ -52,67 +50,62 @@ def painel_inicial():
     rodada_atual = dados_comp.get("currentSeason", {}).get("currentMatchday", "-") if dados_comp else "-"
     total_rodadas = 38
 
-    lider_nome, lider_pts, lider_escudo = "-", "-", ""
     if dados_class and "standings" in dados_class:
-        top = dados_class["standings"][0]["table"][0]
-        lider_nome = top["team"]["name"]
-        lider_pts = top["points"]
-        lider_escudo = top["team"].get("crest", "")
+        lider = dados_class["standings"][0]["table"][0]
+        lider_nome = lider["team"]["name"]
+        lider_pts = lider["points"]
+        lider_escudo = lider["team"].get("crest", "")
+    else:
+        lider_nome = lider_pts = "-"
+        lider_escudo = ""
 
-    art_nome, art_time, art_gols = "-", "-", "-"
     if dados_art and "scorers" in dados_art and len(dados_art["scorers"]) > 0:
-        top = dados_art["scorers"][0]
-        art_nome = top["player"]["name"]
-        art_time = top["team"]["name"]
-        art_gols = top["goals"]
+        art = dados_art["scorers"][0]
+        art_nome = art["player"]["name"]
+        art_time = art["team"]["name"]
+        art_gols = art["goals"]
+    else:
+        art_nome = art_time = art_gols = "-"
 
     st.markdown("<div style='background:#111827; border-radius:10px; padding:10px;'>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        st.markdown(
-            f"""
+        st.markdown(f"""
             <div style='background:#0b1220; padding:14px; border-radius:10px; text-align:center;'>
-                <div style='font-size:14px; color:#9aa5b1;'>🏁 Rodada Atual</div>
-                <div style='font-size:28px; font-weight:700; margin-top:6px;'>{rodada_atual} / {total_rodadas}</div>
+                <div style='color:#9aa5b1;'>🏁 Rodada Atual</div>
+                <div style='font-size:28px; font-weight:700;'>{rodada_atual} / {total_rodadas}</div>
             </div>
-            """,
-            unsafe_allow_html=True
-        )
+        """, unsafe_allow_html=True)
 
     with col2:
         escudo_html = f"<img src='{lider_escudo}' width='45'>" if lider_escudo else ""
-        st.markdown(
-            f"""
+        st.markdown(f"""
             <div style='background:#07121a; padding:14px; border-radius:10px; text-align:center;'>
-                <div style='font-size:14px; color:#9aa5b1;'>🥇 Líder</div>
+                <div style='color:#9aa5b1;'>🥇 Líder</div>
                 {escudo_html}
-                <div style='font-size:18px; font-weight:700; margin-top:4px;'>{lider_nome}</div>
-                <div style='font-size:13px; color:#9aa5b1;'>Pontos: <b>{lider_pts}</b></div>
+                <div style='font-weight:700;'>{lider_nome}</div>
+                <div style='color:#9aa5b1;'>Pontos: <b>{lider_pts}</b></div>
             </div>
-            """,
-            unsafe_allow_html=True
-        )
+        """, unsafe_allow_html=True)
 
     with col3:
-        st.markdown(
-            f"""
+        st.markdown(f"""
             <div style='background:#07121a; padding:14px; border-radius:10px; text-align:center;'>
-                <div style='font-size:14px; color:#9aa5b1;'>⚽ Artilheiro</div>
-                <div style='font-size:16px; font-weight:700; margin-top:6px;'>{art_nome}</div>
-                <div style='font-size:13px; color:#9aa5b1;'>{art_time} — <b>{art_gols} gols</b></div>
+                <div style='color:#9aa5b1;'>⚽ Artilheiro</div>
+                <div style='font-weight:700;'>{art_nome}</div>
+                <div style='color:#9aa5b1;'>{art_time} — <b>{art_gols} gols</b></div>
             </div>
-            """,
-            unsafe_allow_html=True
-        )
+        """, unsafe_allow_html=True)
 
     st.markdown("</div>", unsafe_allow_html=True)
     st.markdown("---")
 
 def ver_jogos():
     st.subheader("📅 Jogos do Dia")
-    data = st.date_input("Selecione a data", value=date.today())
-    url = f"https://api.football-data.org/v4/competitions/BSA/matches?dateFrom={data}&dateTo={data}"
+    data_escolhida = st.date_input("Selecione a data", value=date.today())
+
+    url = f"https://api.football-data.org/v4/competitions/BSA/matches?dateFrom={data_escolhida}&dateTo={data_escolhida}"
     dados = buscar_dados(url)
 
     if not dados or "matches" not in dados or len(dados["matches"]) == 0:
@@ -122,9 +115,9 @@ def ver_jogos():
     for jogo in dados["matches"]:
         casa = jogo["homeTeam"]["name"]
         fora = jogo["awayTeam"]["name"]
-        placar = jogo["score"]["fullTime"]
         esc_casa = jogo["homeTeam"].get("crest", "")
         esc_fora = jogo["awayTeam"].get("crest", "")
+        placar = jogo["score"]["fullTime"]
         status = jogo["status"]
 
         if status == "FINISHED":
@@ -140,8 +133,7 @@ def ver_jogos():
             placar_casa = "NÃO"
             placar_fora = "INICIADO"
 
-        st.markdown(
-            f"""
+        st.markdown(f"""
             <div class='hover-card' style='background:#07121a; padding:12px; border-radius:10px; margin-bottom:10px;
                         display:flex; justify-content:space-between; color:#e6edf3; align-items:center;'>
                 <div style='flex:1; text-align:right;'>
@@ -155,12 +147,11 @@ def ver_jogos():
                     <img src='{esc_fora}' width='40'><br><b>{fora}</b>
                 </div>
             </div>
-            """,
-            unsafe_allow_html=True
-        )
+        """, unsafe_allow_html=True)
 
 def ver_classificacao():
     st.subheader("📊 Classificação do Brasileirão")
+
     dados = buscar_dados("https://api.football-data.org/v4/competitions/BSA/standings")
     if not dados or "standings" not in dados:
         st.error("⚠️ Nenhuma classificação encontrada.")
@@ -168,8 +159,7 @@ def ver_classificacao():
 
     tabela = dados["standings"][0]["table"]
 
-    st.markdown(
-        """
+    st.markdown("""
         <div style='background:#0b1220; color:#cbd5e1; padding:10px; border-radius:8px;
                     display:flex; align-items:center; text-align:center;'>
             <div style='width:35px;'>#</div>
@@ -182,30 +172,31 @@ def ver_classificacao():
             <div style='width:60px;'>D</div>
             <div style='width:80px;'>SG</div>
         </div>
-        """, unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
     for time in tabela:
         pos = time["position"]
         nome = time["team"]["name"]
         escudo = time["team"].get("crest", "")
-        pts, j, v, e, d, sg = (
-            time["points"], time["playedGames"], time["won"],
-            time["draw"], time["lost"], time["goalDifference"]
-        )
+        pts = time["points"]
+        j = time["playedGames"]
+        v = time["won"]
+        e = time["draw"]
+        d = time["lost"]
+        sg = time["goalDifference"]
 
         if pos <= 4:
             borda = "#00b894"
-        elif 5 <= pos <= 6:
+        elif pos <= 6:
             borda = "#0984e3"
-        elif 7 <= pos <= 12:
+        elif pos <= 12:
             borda = "#feca57"
         elif pos >= 17:
             borda = "#d63031"
         else:
             borda = "#636e72"
 
-        st.markdown(
-            f"""
+        st.markdown(f"""
             <div class='hover-card' style='border-left:6px solid {borda}; background:#07121a; padding:10px;
                         border-radius:8px; margin-bottom:8px; display:flex; align-items:center;'>
                 <div style='width:35px; text-align:center; font-weight:700;'>{pos}</div>
@@ -218,21 +209,21 @@ def ver_classificacao():
                 <div style='width:60px; text-align:center;'>{d}</div>
                 <div style='width:80px; text-align:center;'>{sg}</div>
             </div>
-            """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
-    st.markdown(
-        """
+    st.markdown("""
         <div style='margin-top:20px; padding:10px; border-radius:8px; background:#0b1220; color:#cbd5e1;'>
             <b>Legenda das cores:</b><br>
-            🟩 <b>Libertadores</b> (1º–4º) &nbsp;&nbsp;
-            🟦 <b>Pré-Libertadores</b> (5º–6º) &nbsp;&nbsp;
-            🟨 <b>Sul-Americana</b> (7º–12º) &nbsp;&nbsp;
-            🟥 <b>Rebaixamento</b> (17º–20º)
+            🟩 Libertadores (1º–4º) &nbsp;&nbsp;
+            🟦 Pré-Libertadores (5º–6º) &nbsp;&nbsp;
+            🟨 Sul-Americana (7º–12º) &nbsp;&nbsp;
+            🟥 Rebaixamento (17º–20º)
         </div>
-        """, unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
 def ver_artilheiros():
     st.subheader("🏅 Artilheiros do Brasileirão")
+
     dados = buscar_dados("https://api.football-data.org/v4/competitions/BSA/scorers")
     if not dados or "scorers" not in dados or len(dados["scorers"]) == 0:
         st.warning("⚠️ Nenhum dado de artilheiro disponível.")
@@ -243,16 +234,17 @@ def ver_artilheiros():
         time = s["team"]["name"]
         gols = s["goals"]
         escudo = s["team"].get("crest", "")
+
         if i == 1:
-            cor = "#ffd43b"; medalha = "🥇"; texto = "#08121a"
+            cor, medalha, texto = "#ffd43b", "🥇", "#08121a"
         elif i == 2:
-            cor = "#adb5bd"; medalha = "🥈"; texto = "#08121a"
+            cor, medalha, texto = "#adb5bd", "🥈", "#08121a"
         elif i == 3:
-            cor = "#ff9f1c"; medalha = "🥉"; texto = "#08121a"
+            cor, medalha, texto = "#ff9f1c", "🥉", "#08121a"
         else:
-            cor = "#07121a"; medalha = "⚽"; texto = "#e6edf3"
-        st.markdown(
-            f"""
+            cor, medalha, texto = "#07121a", "⚽", "#e6edf3"
+
+        st.markdown(f"""
             <div class='hover-light' style='background:{cor}; color:{texto}; padding:10px; border-radius:8px;
                         margin-bottom:8px; display:flex; align-items:center;'>
                 <div style='width:40px; text-align:center; font-size:20px;'>{medalha}</div>
@@ -260,7 +252,7 @@ def ver_artilheiros():
                 <div style='flex:1;'><b>{jogador}</b><br><span style='font-size:13px;'>{time}</span></div>
                 <div style='font-size:16px; font-weight:700;'>⚽ {gols}</div>
             </div>
-            """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
 st.title("⚽ Brasileirão Série A")
 
