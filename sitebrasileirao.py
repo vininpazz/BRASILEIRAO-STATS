@@ -1,4 +1,3 @@
-# sitebrasileirao.py
 import streamlit as st
 import requests
 from datetime import date
@@ -7,9 +6,6 @@ HEADERS = {"X-Auth-Token": st.secrets["API_KEY"]}
 
 st.set_page_config(page_title="Brasileirão Série A", page_icon="⚽", layout="wide")
 
-# ==============================
-# Estilo (modo escuro + hover)
-# ==============================
 st.markdown(
     """
     <style>
@@ -32,9 +28,6 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# ==============================
-# Cache
-# ==============================
 @st.cache_data(ttl=300)
 def buscar_dados(url):
     try:
@@ -45,18 +38,12 @@ def buscar_dados(url):
     except Exception:
         return None
 
-# ==============================
-# Verificar jogos ao vivo
-# ==============================
 def verificar_jogos_ao_vivo():
     dados = buscar_dados("https://api.football-data.org/v4/competitions/BSA/matches")
     if not dados or "matches" not in dados:
         return False
     return any(m["status"] == "LIVE" for m in dados["matches"])
 
-# ==============================
-# Painel inicial
-# ==============================
 def painel_inicial():
     dados_comp = buscar_dados("https://api.football-data.org/v4/competitions/BSA")
     dados_class = buscar_dados("https://api.football-data.org/v4/competitions/BSA/standings")
@@ -65,7 +52,6 @@ def painel_inicial():
     rodada_atual = dados_comp.get("currentSeason", {}).get("currentMatchday", "-") if dados_comp else "-"
     total_rodadas = 38
 
-    # Líder
     lider_nome, lider_pts, lider_escudo = "-", "-", ""
     if dados_class and "standings" in dados_class:
         top = dados_class["standings"][0]["table"][0]
@@ -73,7 +59,6 @@ def painel_inicial():
         lider_pts = top["points"]
         lider_escudo = top["team"].get("crest", "")
 
-    # Artilheiro
     art_nome, art_time, art_gols = "-", "-", "-"
     if dados_art and "scorers" in dados_art and len(dados_art["scorers"]) > 0:
         top = dados_art["scorers"][0]
@@ -124,9 +109,6 @@ def painel_inicial():
     st.markdown("</div>", unsafe_allow_html=True)
     st.markdown("---")
 
-# ==============================
-# Jogos do Dia (corrigido)
-# ==============================
 def ver_jogos():
     st.subheader("📅 Jogos do Dia")
     data = st.date_input("Selecione a data", value=date.today())
@@ -155,7 +137,6 @@ def ver_jogos():
             placar_fora = placar.get("away", "-")
         else:
             cor = "#74c0fc"; txt = "Agendado"
-            # Mostrar "NÃO - INICIADO" para jogos não iniciados
             placar_casa = "NÃO"
             placar_fora = "INICIADO"
 
@@ -178,9 +159,6 @@ def ver_jogos():
             unsafe_allow_html=True
         )
 
-# ==============================
-# Classificação (alinhamento corrigido)
-# ==============================
 def ver_classificacao():
     st.subheader("📊 Classificação do Brasileirão")
     dados = buscar_dados("https://api.football-data.org/v4/competitions/BSA/standings")
@@ -190,7 +168,6 @@ def ver_classificacao():
 
     tabela = dados["standings"][0]["table"]
 
-    # Cabeçalho com alinhamento fixo
     st.markdown(
         """
         <div style='background:#0b1220; color:#cbd5e1; padding:10px; border-radius:8px;
@@ -243,7 +220,6 @@ def ver_classificacao():
             </div>
             """, unsafe_allow_html=True)
 
-    # Legenda de cores
     st.markdown(
         """
         <div style='margin-top:20px; padding:10px; border-radius:8px; background:#0b1220; color:#cbd5e1;'>
@@ -255,9 +231,6 @@ def ver_classificacao():
         </div>
         """, unsafe_allow_html=True)
 
-# ==============================
-# Artilheiros (com hover)
-# ==============================
 def ver_artilheiros():
     st.subheader("🏅 Artilheiros do Brasileirão")
     dados = buscar_dados("https://api.football-data.org/v4/competitions/BSA/scorers")
@@ -289,9 +262,6 @@ def ver_artilheiros():
             </div>
             """, unsafe_allow_html=True)
 
-# ==============================
-# Interface principal
-# ==============================
 st.title("⚽ Brasileirão Série A")
 
 painel_inicial()
