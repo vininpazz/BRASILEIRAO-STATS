@@ -3,7 +3,7 @@ import streamlit as st
 import requests
 from datetime import date
 
-HEADERS = {"X-Auth-Token": API_KEY}
+HEADERS = {"X-Auth-Token": st.secrets["API_KEY"]}
 
 st.set_page_config(page_title="Brasileirão Série A", page_icon="⚽", layout="wide")
 
@@ -305,4 +305,5 @@ st.markdown(
     "<p style='text-align:center; color:#9aa5b1;'>🏁 Dados fornecidos por <b>Football-Data.org</b></p>",
     unsafe_allow_html=True
 )
+
 
