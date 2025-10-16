@@ -3,11 +3,9 @@ import requests
 from datetime import date, timedelta, datetime, timezone
 from streamlit_autorefresh import st_autorefresh
 
-# 🔁 Atualização automática a cada 60 segundos
 st_autorefresh(interval=60000, key="datarefresh")
 
-# Configuração inicial
-API_KEY = "52a2e7b05642458d856b3f606a8f566d"
+API_KEY = st.secrets["API_KEY"]
 HEADERS = {"X-Auth-Token": API_KEY}
 
 st.set_page_config(page_title="Brasileirão Série A", page_icon="⚽", layout="wide")
@@ -31,7 +29,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- Buscar dados da API com cache leve ---
+
 @st.cache_data(ttl=30)
 def buscar_dados(url):
     try:
@@ -42,14 +40,12 @@ def buscar_dados(url):
     except Exception:
         return None
 
-# --- Verificar se há jogos ao vivo ---
 def verificar_jogos_ao_vivo():
     dados = buscar_dados("https://api.football-data.org/v4/competitions/BSA/matches")
     if not dados or "matches" not in dados:
         return False
     return any(m["status"] in ["LIVE", "IN_PLAY"] for m in dados["matches"])
 
-# --- Painel principal ---
 def painel_inicial():
     dados_comp = buscar_dados("https://api.football-data.org/v4/competitions/BSA")
     dados_class = buscar_dados("https://api.football-data.org/v4/competitions/BSA/standings")
@@ -109,7 +105,7 @@ def painel_inicial():
     st.markdown("</div>", unsafe_allow_html=True)
     st.markdown("---")
 
-# --- Mostrar jogos ---
+
 def ver_jogos():
     st.subheader("📅 Jogos do Dia")
     data_escolhida = st.date_input("Selecione a data", value=date.today())
@@ -187,7 +183,6 @@ def ver_jogos():
             </div>
         """, unsafe_allow_html=True)
 
-# --- Página principal ---
 st.title("⚽ Brasileirão Série A")
 
 painel_inicial()
