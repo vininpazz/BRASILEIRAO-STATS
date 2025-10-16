@@ -1,0 +1,201 @@
+import streamlit as st
+import requests
+from datetime import date, timedelta, datetime, timezone
+from streamlit_autorefresh import st_autorefresh
+
+# 🔁 Atualização automática a cada 60 segundos
+st_autorefresh(interval=60000, key="datarefresh")
+
+# Configuração inicial
+API_KEY = "52a2e7b05642458d856b3f606a8f566d"
+HEADERS = {"X-Auth-Token": API_KEY}
+
+st.set_page_config(page_title="Brasileirão Série A", page_icon="⚽", layout="wide")
+
+st.markdown("""
+    <style>
+    .stApp {
+        background-color: #0f1720;
+        color: #e6edf3;
+    }
+    .hover-card:hover {
+        transform: scale(1.01);
+        transition: 0.2s;
+        box-shadow: 0 0 10px rgba(255,255,255,0.1);
+    }
+    .hover-light:hover {
+        transform: scale(1.01);
+        transition: 0.2s;
+        box-shadow: 0 0 10px rgba(255,255,255,0.15);
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# --- Buscar dados da API com cache leve ---
+@st.cache_data(ttl=30)
+def buscar_dados(url):
+    try:
+        resposta = requests.get(url, headers=HEADERS, timeout=10)
+        if resposta.status_code != 200:
+            return None
+        return resposta.json()
+    except Exception:
+        return None
+
+# --- Verificar se há jogos ao vivo ---
+def verificar_jogos_ao_vivo():
+    dados = buscar_dados("https://api.football-data.org/v4/competitions/BSA/matches")
+    if not dados or "matches" not in dados:
+        return False
+    return any(m["status"] in ["LIVE", "IN_PLAY"] for m in dados["matches"])
+
+# --- Painel principal ---
+def painel_inicial():
+    dados_comp = buscar_dados("https://api.football-data.org/v4/competitions/BSA")
+    dados_class = buscar_dados("https://api.football-data.org/v4/competitions/BSA/standings")
+    dados_art = buscar_dados("https://api.football-data.org/v4/competitions/BSA/scorers")
+
+    rodada_atual = dados_comp.get("currentSeason", {}).get("currentMatchday", "-") if dados_comp else "-"
+    total_rodadas = 38
+
+    if dados_class and "standings" in dados_class:
+        lider = dados_class["standings"][0]["table"][0]
+        lider_nome = lider["team"]["name"]
+        lider_pts = lider["points"]
+        lider_escudo = lider["team"].get("crest", "")
+    else:
+        lider_nome = lider_pts = "-"
+        lider_escudo = ""
+
+    if dados_art and "scorers" in dados_art and len(dados_art["scorers"]) > 0:
+        art = dados_art["scorers"][0]
+        art_nome = art["player"]["name"]
+        art_time = art["team"]["name"]
+        art_gols = art["goals"]
+    else:
+        art_nome = art_time = art_gols = "-"
+
+    st.markdown("<div style='background:#111827; border-radius:10px; padding:10px;'>", unsafe_allow_html=True)
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.markdown(f"""
+            <div style='background:#0b1220; padding:14px; border-radius:10px; text-align:center;'>
+                <div style='color:#9aa5b1;'>🏁 Rodada Atual</div>
+                <div style='font-size:28px; font-weight:700;'>{rodada_atual} / {total_rodadas}</div>
+            </div>
+        """, unsafe_allow_html=True)
+
+    with col2:
+        escudo_html = f"<img src='{lider_escudo}' width='45'>" if lider_escudo else ""
+        st.markdown(f"""
+            <div style='background:#07121a; padding:14px; border-radius:10px; text-align:center;'>
+                <div style='color:#9aa5b1;'>🥇 Líder</div>
+                {escudo_html}
+                <div style='font-weight:700;'>{lider_nome}</div>
+                <div style='color:#9aa5b1;'>Pontos: <b>{lider_pts}</b></div>
+            </div>
+        """, unsafe_allow_html=True)
+
+    with col3:
+        st.markdown(f"""
+            <div style='background:#07121a; padding:14px; border-radius:10px; text-align:center;'>
+                <div style='color:#9aa5b1;'>⚽ Artilheiro</div>
+                <div style='font-weight:700;'>{art_nome}</div>
+                <div style='color:#9aa5b1;'>{art_time} — <b>{art_gols} gols</b></div>
+            </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown("---")
+
+# --- Mostrar jogos ---
+def ver_jogos():
+    st.subheader("📅 Jogos do Dia")
+    data_escolhida = st.date_input("Selecione a data", value=date.today())
+
+    data_inicio = data_escolhida - timedelta(days=2)
+    data_fim = data_escolhida + timedelta(days=2)
+
+    url_data = f"https://api.football-data.org/v4/competitions/BSA/matches?dateFrom={data_inicio}&dateTo={data_fim}"
+    dados = buscar_dados(url_data)
+
+    if not dados or "matches" not in dados:
+        st.warning("⚠️ Nenhum jogo encontrado para esta data.")
+        return
+
+    jogos_encontrados = []
+
+    for jogo in dados["matches"]:
+        data_utc = jogo.get("utcDate", "")
+        if not data_utc:
+            continue
+        try:
+            dt_utc = datetime.fromisoformat(data_utc.replace("Z", "+00:00"))
+            dt_brasil = dt_utc.astimezone(timezone(timedelta(hours=-3)))
+            data_jogo_local = dt_brasil.date()
+        except Exception:
+            continue
+
+        if data_jogo_local != data_escolhida:
+            continue
+
+        jogos_encontrados.append((jogo, dt_brasil.strftime("%H:%M")))
+
+    if not jogos_encontrados:
+        st.warning("⚠️ Nenhum jogo encontrado para esta data.")
+        return
+
+    for jogo, horario in jogos_encontrados:
+        casa = jogo["homeTeam"]["name"]
+        fora = jogo["awayTeam"]["name"]
+        esc_casa = jogo["homeTeam"].get("crest", "")
+        esc_fora = jogo["awayTeam"].get("crest", "")
+        placar = jogo["score"]["fullTime"]
+        status = jogo["status"]
+
+        if status == "FINISHED":
+            cor = "#a3b1b8"; txt = f"Finalizado ({horario})"
+            placar_casa = placar.get("home", "-")
+            placar_fora = placar.get("away", "-")
+        elif status in ["LIVE", "IN_PLAY"]:
+            cor = "#ff6b6b"; txt = "🔴 Ao vivo"
+            placar_casa = placar.get("home", "-")
+            placar_fora = placar.get("away", "-")
+        elif status == "PAUSED":
+            cor = "#ff9f43"; txt = "⏸ Intervalo"
+            placar_casa = placar.get("home", "-")
+            placar_fora = placar.get("away", "-")
+        else:
+            cor = "#74c0fc"; txt = f"Agendado — {horario}"
+            placar_casa = "—"
+            placar_fora = "—"
+
+        st.markdown(f"""
+            <div class='hover-card' style='background:#07121a; padding:12px; border-radius:10px; margin-bottom:10px;
+                        display:flex; justify-content:space-between; color:#e6edf3; align-items:center;'>
+                <div style='flex:1; text-align:right;'>
+                    <img src='{esc_casa}' width='40'><br><b>{casa}</b>
+                </div>
+                <div style='flex:0.6; text-align:center;'>
+                    <div style='font-size:20px; font-weight:700;'>{placar_casa} - {placar_fora}</div>
+                    <div style='font-size:12px; color:{cor};'>{txt}</div>
+                </div>
+                <div style='flex:1; text-align:left;'>
+                    <img src='{esc_fora}' width='40'><br><b>{fora}</b>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+
+# --- Página principal ---
+st.title("⚽ Brasileirão Série A")
+
+painel_inicial()
+
+tem_ao_vivo = verificar_jogos_ao_vivo()
+aba_label = "📅 Jogos do Dia 🔴" if tem_ao_vivo else "📅 Jogos do Dia"
+
+aba_jogos, aba_class, aba_art = st.tabs([aba_label, "📊 Classificação", "🏅 Artilheiros"])
+
+with aba_jogos:
+    ver_jogos()
