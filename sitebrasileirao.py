@@ -1,9 +1,7 @@
 import streamlit as st
 import requests
 from datetime import date, timedelta, datetime, timezone
-from streamlit_autorefresh import st_autorefresh
 
-st_autorefresh(interval=60000, key="datarefresh")
 
 API_KEY = st.secrets["API_KEY"]
 HEADERS = {"X-Auth-Token": API_KEY}
