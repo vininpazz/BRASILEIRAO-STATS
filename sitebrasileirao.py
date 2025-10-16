@@ -131,7 +131,7 @@ def ver_jogos():
         else:
             cor = "#74c0fc"; txt = "Agendado"
             placar_casa = "NÃO"
-            placar_fora = "INICIADO"
+            placar_fora = "FINALIZADO"
 
         st.markdown(f"""
             <div class='hover-card' style='background:#07121a; padding:12px; border-radius:10px; margin-bottom:10px;
