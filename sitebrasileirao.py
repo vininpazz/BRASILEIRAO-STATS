@@ -1,12 +1,7 @@
 import streamlit as st
 import requests
-from datetime import date, timedelta
-from streamlit_autorefresh import st_autorefresh
+from datetime import date
 
-# 🔁 Atualização automática a cada 60 segundos
-st_autorefresh(interval=60000, key="datarefresh")
-
-# Configuração inicial
 API_KEY = st.secrets["API_KEY"]
 HEADERS = {"X-Auth-Token": API_KEY}
 
@@ -31,8 +26,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- Buscar dados da API com cache leve ---
-@st.cache_data(ttl=30)
+@st.cache_data(ttl=300)
 def buscar_dados(url):
     try:
         resposta = requests.get(url, headers=HEADERS, timeout=10)
@@ -42,14 +36,12 @@ def buscar_dados(url):
     except Exception:
         return None
 
-# --- Verificar se há jogos ao vivo ---
 def verificar_jogos_ao_vivo():
     dados = buscar_dados("https://api.football-data.org/v4/competitions/BSA/matches")
     if not dados or "matches" not in dados:
         return False
-    return any(m["status"] in ["LIVE", "IN_PLAY"] for m in dados["matches"])
+    return any(m["status"] == "LIVE" for m in dados["matches"])
 
-# --- Painel principal ---
 def painel_inicial():
     dados_comp = buscar_dados("https://api.football-data.org/v4/competitions/BSA")
     dados_class = buscar_dados("https://api.football-data.org/v4/competitions/BSA/standings")
@@ -109,19 +101,12 @@ def painel_inicial():
     st.markdown("</div>", unsafe_allow_html=True)
     st.markdown("---")
 
-# --- Mostrar jogos ---
 def ver_jogos():
     st.subheader("📅 Jogos do Dia")
     data_escolhida = st.date_input("Selecione a data", value=date.today())
 
-    # Amplia o intervalo para garantir que jogos ao vivo apareçam
-    data_inicio = data_escolhida - timedelta(days=1)
-    data_fim = data_escolhida + timedelta(days=1)
-
-    url = f"https://api.football-data.org/v4/competitions/BSA/matches?dateFrom={data_inicio}&dateTo={data_fim}"
+    url = f"https://api.football-data.org/v4/competitions/BSA/matches?dateFrom={data_escolhida}&dateTo={data_escolhida}"
     dados = buscar_dados(url)
-
-    # ✅ Nenhum botão aqui — removido completamente
 
     if not dados or "matches" not in dados or len(dados["matches"]) == 0:
         st.warning("⚠️ Nenhum jogo encontrado para esta data.")
@@ -139,12 +124,8 @@ def ver_jogos():
             cor = "#a3b1b8"; txt = "Finalizado"
             placar_casa = placar.get("home", "-")
             placar_fora = placar.get("away", "-")
-        elif status in ["LIVE", "IN_PLAY"]:
+        elif status == "LIVE":
             cor = "#ff6b6b"; txt = "🔴 Ao vivo"
-            placar_casa = placar.get("home", "-")
-            placar_fora = placar.get("away", "-")
-        elif status == "PAUSED":
-            cor = "#ff9f43"; txt = "⏸ Intervalo"
             placar_casa = placar.get("home", "-")
             placar_fora = placar.get("away", "-")
         else:
@@ -168,7 +149,6 @@ def ver_jogos():
             </div>
         """, unsafe_allow_html=True)
 
-# --- Classificação ---
 def ver_classificacao():
     st.subheader("📊 Classificação do Brasileirão")
 
@@ -241,7 +221,6 @@ def ver_classificacao():
         </div>
     """, unsafe_allow_html=True)
 
-# --- Artilheiros ---
 def ver_artilheiros():
     st.subheader("🏅 Artilheiros do Brasileirão")
 
@@ -275,7 +254,6 @@ def ver_artilheiros():
             </div>
         """, unsafe_allow_html=True)
 
-# --- Página principal ---
 st.title("⚽ Brasileirão Série A")
 
 painel_inicial()
